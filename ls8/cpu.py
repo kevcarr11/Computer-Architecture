@@ -11,10 +11,10 @@ class CPU:
         self.ram = [0] * 256
         self.pc = 0
         self.opcodes = {
-            0b10000010 :"LDI",
-            0b01000111 :"PRN",
-            0b10100010 :"MUL",
-            0b00000001 :"HLT",
+            "LDI": 0b10000010,
+            "PRN": 0b01000111,
+            "MUL": 0b10100010,
+            "HLT": 0b00000001,
         }
 
     def ram_read(self, MAR):
@@ -24,7 +24,8 @@ class CPU:
         self.ram[MAR] = MDR
 
     def load(self):
-        """Load a program into memory."""
+        """
+        Load a program into memory.
 
         address = 0
 
@@ -43,6 +44,30 @@ class CPU:
         for instruction in program:
             self.ram[address] = instruction
             address += 1
+        """
+        address = 0
+
+        if len(sys.argv) != 2:
+            print('Please Follow Example Usage: ls8.py filename')
+            sys.exit(1)
+
+        try:
+
+            with open(sys.argv[1]) as f:
+                for line in f:
+                    split = line.split('#')
+                    code = split[0].strip()
+
+                    if code == '':
+                        continue
+
+                    num = int(code, 2)
+                    self.ram_write(num, address)
+                    address += 1
+
+        except FileNotFoundError:
+            print(f'{sys.argv[1]} file not found')
+            sys.exit(2)
 
 
     def alu(self, op, reg_a, reg_b):
@@ -78,11 +103,10 @@ class CPU:
         running = True
         
         while running:
-
             # read line by line from ram
             instruction = self.ram[self.pc]
 
-            if instruction == 0b10000010:
+            if instruction == self.opcodes["LDI"]:
                 self.load()
                 operand_a = self.ram_read(self.pc + 1)
                 operand_b = self.ram_read(self.pc + 2)
@@ -90,19 +114,19 @@ class CPU:
                 self.pc += 3
 
 
-            elif instruction == 0b01000111:
+            elif instruction == self.opcodes["PRN"]:
                 reg_locaton = self.ram_read(self.pc + 1)
                 print(self.reg[reg_locaton])
                 self.pc += 2
 
-            elif instruction == 0b00000001:
+            elif instruction == self.opcodes["HLT"]:
                 running = False
                 self.pc += 1
                 
             
             else:
+                running = False
                 print(f'Unknown instruction {instruction}')
+                
 
-            # for i in range(8):
-            #     print(' self.reg[i] end ')
             
