@@ -6,8 +6,22 @@ class CPU:
     """Main CPU class."""
 
     def __init__(self):
-        """Construct a new CPU."""
-        pass
+        # general purpose registers for doing work
+        self.reg = [0] * 8
+        self.ram = [0] * 256
+        self.pc = 0
+        self.opcodes = {
+            0b10000010 :"LDI",
+            0b01000111 :"PRN",
+            0b10100010 :"MUL",
+            0b00000001 :"HLT",
+        }
+
+    def ram_read(self, MAR):
+        return self.ram[MAR]
+
+    def ram_write(self, MDR, MAR):
+        self.ram[MAR] = MDR
 
     def load(self):
         """Load a program into memory."""
@@ -61,5 +75,34 @@ class CPU:
         print()
 
     def run(self):
-        """Run the CPU."""
-        pass
+        running = True
+        
+        while running:
+
+            # read line by line from ram
+            instruction = self.ram[self.pc]
+
+            if instruction == 0b10000010:
+                self.load()
+                operand_a = self.ram_read(self.pc + 1)
+                operand_b = self.ram_read(self.pc + 2)
+                self.reg[operand_a] = operand_b
+                self.pc += 3
+
+
+            elif instruction == 0b01000111:
+                reg_locaton = self.ram_read(self.pc + 1)
+                print(self.reg[reg_locaton])
+                self.pc += 2
+
+            elif instruction == 0b00000001:
+                running = False
+                self.pc += 1
+                
+            
+            else:
+                print(f'Unknown instruction {instruction}')
+
+            # for i in range(8):
+            #     print(' self.reg[i] end ')
+            
