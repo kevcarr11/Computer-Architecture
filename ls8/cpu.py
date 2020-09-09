@@ -2,6 +2,7 @@
 
 import sys
 
+
 class CPU:
     """Main CPU class."""
 
@@ -10,12 +11,18 @@ class CPU:
         self.reg = [0] * 8
         self.ram = [0] * 256
         self.pc = 0
+        self.running = False
         self.opcodes = {
             "LDI": 0b10000010,
             "PRN": 0b01000111,
             "MUL": 0b10100010,
             "HLT": 0b00000001,
         }
+        self.branch_table = {}
+        self.branch_table[self.opcodes["LDI"]] = self.handle_ldi
+        self.branch_table[self.opcodes["PRN"]] = self.handle_prn
+        self.branch_table[self.opcodes["MUL"]] = self.handle_mul
+        self.branch_table[self.opcodes["HLT"]] = self.handle_hlt
 
     def ram_read(self, MAR):
         return self.ram[MAR]
@@ -25,8 +32,25 @@ class CPU:
 
     def load(self):
         """
-        Load a program into memory.
+        Day One
+
+        # address = 0
+
+        # program = [
+        #     # From print8.ls8
+        #     0b10000010, # LDI R0,8
+        #     0b00000000,
+        #     0b00001000,
+        #     0b01000111, # PRN R0
+        #     0b00000000,
+        #     0b00000001, # HLT
+        # ]
+
+        # for instruction in program:
+        #     self.ram[address] = instruction
+        #     address += 1
         """
+
         address = 0
 
         if len(sys.argv) != 2:
@@ -51,7 +75,6 @@ class CPU:
             print(f'{sys.argv[1]} file not found')
             sys.exit(2)
 
-
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
@@ -70,8 +93,8 @@ class CPU:
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.pc,
-            #self.fl,
-            #self.ie,
+            # self.fl,
+            # self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
             self.ram_read(self.pc + 2)
@@ -82,37 +105,35 @@ class CPU:
 
         print()
 
+    def handle_ldi(self):
+        self.load()
+        operand_a = self.ram_read(self.pc + 1)
+        operand_b = self.ram_read(self.pc + 2)
+        self.reg[operand_a] = operand_b
+        self.pc += 3
+
+    def handle_mul(self):
+        self.alu("MUL", self.reg[0], self.reg[1])
+        self.pc += 3
+
+    def handle_prn(self):
+        reg_locaton = self.ram_read(self.pc + 1)
+        print(self.reg[reg_locaton])
+        self.pc += 2
+
+    def handle_hlt(self):
+        self.running = False
+        self.pc += 1
+
     def run(self):
-        running = True
-        
-        while running:
+        self.running = True
+
+        while self.running:
             # read line by line from ram
             instruction = self.ram[self.pc]
-
-            if instruction == self.opcodes["LDI"]:
-                self.load()
-                operand_a = self.ram_read(self.pc + 1)
-                operand_b = self.ram_read(self.pc + 2)
-                self.reg[operand_a] = operand_b
-                self.pc += 3
-
-            elif instruction == self.opcodes["MUL"]:
-                self.alu("MUL", self.reg[0], self.reg[1])
-                self.pc += 3
-
-            elif instruction == self.opcodes["PRN"]:
-                reg_locaton = self.ram_read(self.pc + 1)
-                print(self.reg[reg_locaton])
-                self.pc += 2
-
-            elif instruction == self.opcodes["HLT"]:
-                running = False
-                self.pc += 1
-                
-            
+        
+            if self.branch_table[instruction]:
+                self.branch_table[instruction]()
             else:
-                running = False
+                self.running = False
                 print(f'Unknown instruction {instruction}')
-                
-
-            
