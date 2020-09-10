@@ -10,19 +10,27 @@ class CPU:
         # general purpose registers for doing work
         self.reg = [0] * 8
         self.ram = [0] * 256
-        self.pc = 0
+        self.pc = 0 
+        # reserve position 5 for SP and set value to top position of ram
+        self.reg[7] = len(self.ram) -1
+        self.sp = self.reg[7]
         self.running = False
         self.opcodes = {
             "LDI": 0b10000010,
             "PRN": 0b01000111,
             "MUL": 0b10100010,
             "HLT": 0b00000001,
+            "PUSH": 0b01000101,
+            "POP": 0b01000110
         }
         self.branch_table = {}
         self.branch_table[self.opcodes["LDI"]] = self.handle_ldi
         self.branch_table[self.opcodes["PRN"]] = self.handle_prn
         self.branch_table[self.opcodes["MUL"]] = self.handle_mul
         self.branch_table[self.opcodes["HLT"]] = self.handle_hlt
+        self.branch_table[self.opcodes["PUSH"]] = self.handle_push
+        self.branch_table[self.opcodes["POP"]] = self.handle_pop
+
 
     def ram_read(self, MAR):
         return self.ram[MAR]
@@ -31,26 +39,6 @@ class CPU:
         self.ram[MAR] = MDR
 
     def load(self):
-        """
-        Day One
-
-        # address = 0
-
-        # program = [
-        #     # From print8.ls8
-        #     0b10000010, # LDI R0,8
-        #     0b00000000,
-        #     0b00001000,
-        #     0b01000111, # PRN R0
-        #     0b00000000,
-        #     0b00000001, # HLT
-        # ]
-
-        # for instruction in program:
-        #     self.ram[address] = instruction
-        #     address += 1
-        """
-
         address = 0
 
         if len(sys.argv) != 2:
@@ -124,6 +112,20 @@ class CPU:
     def handle_hlt(self):
         self.running = False
         self.pc += 1
+    
+    def handle_push(self):
+        given_register = self.ram[self.pc + 1]
+        value_in_register = self.reg[given_register]
+        self.sp -= 1
+        self.ram[self.sp] = value_in_register
+        self.pc += 2 
+
+    def handle_pop(self):
+        given_register = self.ram[self.pc + 1]
+        value_from_memory = self.ram[self.sp]
+        self.reg[given_register] = value_from_memory
+        self.sp += 1
+        self.pc += 2
 
     def run(self):
         self.running = True
