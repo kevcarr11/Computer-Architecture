@@ -161,10 +161,14 @@ class CPU:
     def handle_jmp(self):
         # get the given register in the operand
         given_register = self.ram[self.pc + 1]
+        # Set the `PC` to the address stored in the given register.
         self.pc = self.reg[given_register]
 
     def handle_jeq(self):
+        # get the given register in the operand
         given_register = self.ram[self.pc + 1]
+        # If `equal` flag is set (true), jump to the address stored in the given register.
+        # if not just move the program forward to the next instruction
         if self.flags['E'] is True:
             self.pc = self.reg[given_register]
         else:
@@ -172,6 +176,8 @@ class CPU:
     
     def handle_jne(self):
         given_register = self.ram[self.pc + 1]
+        # If `E` flag is clear (false, 0), jump to the address stored in the given register.
+        # if not just move the program forward to the next instruction
         if self.flags['E'] == False:
             self.pc = self.reg[given_register]
         else:
