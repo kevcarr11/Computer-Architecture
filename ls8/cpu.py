@@ -2,41 +2,97 @@
 
 import sys
 
+
 class CPU:
     """Main CPU class."""
 
     def __init__(self):
-        """Construct a new CPU."""
-        pass
+        self.opcodes = {
+            "LDI": 0b10000010,
+            "PRN": 0b01000111,
+            "MUL": 0b10100010,
+            "HLT": 0b00000001,
+            "PUSH": 0b01000101,
+            "POP": 0b01000110,
+            "CMP": 0b10100111,
+            "JMP": 0b01010100,
+            "JEQ": 0b01010101,
+            "JNE": 0b01010110
+        }
+        # general purpose registers for doing work
+        self.reg = [0] * 8
+        self.ram = [0] * 256
+        self.pc = 0
+        # flags register
+        self.reg[4] = {}
+        self.flags = self.reg[4]
+        self.flags['E'] = False
+        self.flags['L'] = False
+        self.flags['G'] = False
+        # reserve position 7 for SP and set value to top position of ram
+        self.reg[7] = len(self.ram) -1
+        self.sp = self.reg[7]
+
+        self.running = False
+        # dict to map instructions to their respective function handler 
+        self.branch_table = {}
+        self.branch_table[self.opcodes["LDI"]] = self.handle_ldi
+        self.branch_table[self.opcodes["PRN"]] = self.handle_prn
+        self.branch_table[self.opcodes["MUL"]] = self.handle_mul
+        self.branch_table[self.opcodes["HLT"]] = self.handle_hlt
+        self.branch_table[self.opcodes["PUSH"]] = self.handle_push
+        self.branch_table[self.opcodes["POP"]] = self.handle_pop
+        self.branch_table[self.opcodes["CMP"]] = self.handle_cmp
+        self.branch_table[self.opcodes["JMP"]] = self.handle_jmp
+        self.branch_table[self.opcodes["JEQ"]] = self.handle_jeq
+        self.branch_table[self.opcodes["JNE"]] = self.handle_jne
+
+
+    def ram_read(self, MAR):
+        return self.ram[MAR]
+
+    def ram_write(self, MDR, MAR):
+        self.ram[MAR] = MDR
 
     def load(self):
-        """Load a program into memory."""
-
         address = 0
 
-        # For now, we've just hardcoded a program:
+        if len(sys.argv) != 2:
+            print('Please Follow Example Usage: ls8.py filename')
+            sys.exit(1)
 
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
+        try:
 
-        for instruction in program:
-            self.ram[address] = instruction
-            address += 1
+            with open(sys.argv[1]) as f:
+                for line in f:
+                    split = line.split('#')
+                    code = split[0].strip()
 
+                    if code == '':
+                        continue
+
+                    num = int(code, 2)
+                    self.ram_write(num, address)
+                    address += 1
+
+        except FileNotFoundError:
+            print(f'{sys.argv[1]} file not found')
+            sys.exit(2)
 
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        #elif op == "SUB": etc
+        elif op == "MUL":
+            self.reg[0] = reg_a * reg_b
+        elif op == "CMP":
+            if reg_a == reg_b:
+                self.flags['E'] = True
+            elif reg_a < reg_b:
+                self.flags['L'] = True
+            elif reg_b > reg_b:
+                self.flags['G'] = True
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -48,8 +104,8 @@ class CPU:
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.pc,
-            #self.fl,
-            #self.ie,
+            # self.flags,
+            # self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
             self.ram_read(self.pc + 2)
@@ -60,6 +116,84 @@ class CPU:
 
         print()
 
+    def handle_ldi(self):
+        self.load()
+        operand_a = self.ram_read(self.pc + 1)
+        operand_b = self.ram_read(self.pc + 2)
+        self.reg[operand_a] = operand_b
+        self.pc += 3
+
+    def handle_mul(self):
+        self.alu("MUL", self.reg[0], self.reg[1])
+        self.pc += 3
+
+    def handle_prn(self):
+        reg_locaton = self.ram_read(self.pc + 1)
+        print(self.reg[reg_locaton])
+        self.pc += 2
+
+    def handle_hlt(self):
+        self.running = False
+        self.pc += 1
+    
+    def handle_push(self):
+        given_register = self.ram[self.pc + 1]
+        value_in_register = self.reg[given_register]
+        # decrement the Stack Pointer
+        self.sp -= 1
+        # write the value of the given register to memory AT the SP location
+        self.ram[self.sp] = value_in_register
+        self.pc += 2 
+
+    def handle_pop(self):
+        given_register = self.ram[self.pc + 1]
+        # Write the value in memory at the top of stack to the given register
+        value_from_memory = self.ram[self.sp]
+        self.reg[given_register] = value_from_memory
+        # increment the stack pointer
+        self.sp += 1
+        self.pc += 2
+
+    def handle_cmp(self):
+        self.alu("CMP", self.reg[0], self.reg[1])
+        self.pc += 3
+    
+    def handle_jmp(self):
+        # get the given register in the operand
+        given_register = self.ram[self.pc + 1]
+        # Set the `PC` to the address stored in the given register.
+        self.pc = self.reg[given_register]
+
+    def handle_jeq(self):
+        # get the given register in the operand
+        given_register = self.ram[self.pc + 1]
+        # If `equal` flag is set (true), jump to the address stored in the given register.
+        # if not just move the program forward to the next instruction
+        if self.flags['E'] is True:
+            self.pc = self.reg[given_register]
+        else:
+            self.pc += 2
+    
+    def handle_jne(self):
+        given_register = self.ram[self.pc + 1]
+        # If `E` flag is clear (false, 0), jump to the address stored in the given register.
+        # if not just move the program forward to the next instruction
+        if self.flags['E'] == False:
+            self.pc = self.reg[given_register]
+        else:
+            self.pc += 2
+
     def run(self):
-        """Run the CPU."""
-        pass
+        self.running = True
+
+        while self.running:
+            # read line by line from ram
+            instruction = self.ram[self.pc]
+            # if instruction exists in branch table
+            if instruction in self.branch_table:
+                # run function handler for that instruction
+                self.branch_table[instruction]()
+            else:
+                self.running = False
+                print(f'Unknown instruction {bin(instruction)}')
+                sys.exit(1)
